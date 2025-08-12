@@ -3,11 +3,11 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-<title>忍者潜入🏯 — ステージ&サイズアップ版</title>
+<title>忍者潜入🏯 — ステージ&サイズアップ（はみ出し防止）</title>
 <style>
   :root{
     --bg:#0a0f1c; --text:#eef3ff; --muted:#a8b7d3;
-    --cell:52px; /* JSで画面幅に応じて上書き（40〜64px） */
+    --cell:52px; /* JSで上書き（最大64pxまで） */
     --covered1:#1a2b52; --covered2:#132447; --covered-border:#3a5a94;
     --open1:#0f1b37; --open2:#0a1430; --open-border:#2c497b;
     --frontier:#46e1ff; --frontier-glow:#46e1ff55;
@@ -37,9 +37,16 @@
   }
   .linkbtn:hover{filter:brightness(1.1)}
 
-  #boardWrap{width:100%;display:flex;justify-content:center;margin:.5rem 0}
+  /* ← 左端が切れないよう左右に余白＆セーフエリア */
+  #boardWrap{
+    width:100%;
+    display:flex;
+    justify-content:center;
+    margin:.5rem 0;
+    padding-inline: max(8px, env(safe-area-inset-left), env(safe-area-inset-right));
+  }
   #board{
-    display:grid; gap:7px; grid-template-columns:repeat(8,var(--cell)); /* JSで列数を更新 */
+    display:grid; gap:7px; grid-template-columns:repeat(8,var(--cell)); /* JSで列数更新 */
     background:#0b1734; border:2px solid #233a64; padding:14px; border-radius:16px;
     box-shadow:inset 0 0 0 1px rgba(255,255,255,.05),0 16px 40px rgba(0,0,0,.5);
     touch-action:manipulation;
@@ -56,9 +63,19 @@
   .cell:focus-visible{outline:3px solid var(--focus); outline-offset:2px}
 
   .cell.open{ background:linear-gradient(180deg,var(--open1),var(--open2)); border-color:var(--open-border); cursor:default; box-shadow:inset 0 3px 10px rgba(0,0,0,.45) }
-  .cell.locked{ cursor:not-allowed; opacity:.50; background:repeating-linear-gradient(135deg,var(--locked-stripe) 0 8px,transparent 8px 16px),linear-gradient(180deg,var(--covered1),var(--covered2)) }
-  .cell.frontier{ box-shadow:0 0 0 3px var(--frontier) inset, 0 0 16px 2px var(--frontier-glow); border-color:#4bd3ff; filter:brightness(1.06); animation:pulse 1.2s ease-in-out infinite alternate }
-  @keyframes pulse{ 0%{ box-shadow:0 0 0 2px var(--frontier) inset, 0 0 10px 1px var(--frontier-glow) } 100%{ box-shadow:0 0 0 4px var(--frontier) inset, 0 0 20px 3px var(--frontier-glow) } }
+  .cell.locked{
+    cursor:not-allowed; opacity:.50;
+    background:repeating-linear-gradient(135deg,var(--locked-stripe) 0 8px,transparent 8px 16px),linear-gradient(180deg,var(--covered1),var(--covered2));
+  }
+  .cell.frontier{
+    box-shadow:0 0 0 3px var(--frontier) inset, 0 0 16px 2px var(--frontier-glow);
+    border-color:#4bd3ff; filter:brightness(1.06);
+    animation:pulse 1.2s ease-in-out infinite alternate;
+  }
+  @keyframes pulse{
+    0%{ box-shadow:0 0 0 2px var(--frontier) inset, 0 0 10px 1px var(--frontier-glow) }
+    100%{ box-shadow:0 0 0 4px var(--frontier) inset, 0 0 20px 3px var(--frontier-glow) }
+  }
   .cell.start{ outline:2px dashed var(--start-outline); outline-offset:-2px }
   .cell.castle::after{ content:"🏯"; position:absolute; font-size:calc(var(--cell)*0.62); filter:drop-shadow(0 0 6px rgba(255,213,79,.35)) }
   .cell.trap{ background:linear-gradient(180deg,var(--trap-bg),#4f1111); border-color:var(--trap-border) }
@@ -66,7 +83,7 @@
   .n1{color:#76b7ff}.n2{color:#55d68c}.n3{color:#ffc14d}.n4{color:#c5a3ff}
   .n5{color:#ff9a6b}.n6{color:#8fe3ff}.n7{color:#ff7d92}.n8{color:#ffffff}
 
-  /* 忍者マーカー（最後にタップしたマス） */
+  /* 忍者マーカー */
   .cell.ninja::before{
     content:"🥷"; position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
     font-size:calc(var(--cell)*0.58); transform:translateY(-1px);
@@ -141,14 +158,11 @@
   <div id="confetti" class="confetti hidden"></div>
 
 <script>
-/* ===== ステージ & サイズアップ / スマホ自動リサイズ ===== */
+/* ===== ステージ & サイズアップ / はみ出し防止リサイズ ===== */
 /* 仕様：左から順のみ / 上下OK・斜めNG / 自動連鎖なし / 忍者マーカー / フロント強調 */
 
-const CAP_CELL_MAX = 64;  // 1マスの最大px
-const CAP_CELL_MIN = 40;  // 1マスの最小px
-const GAP = 7;            // CSSと合わせる（セルのgap）
-const PADDING = 14;       // #board の左右padding
-const BORDER = 2;         // #board のborder幅
+const CAP_CELL_MAX = 64;   // 1マスの上限px（下限は付けない = 収まり優先）
+const GAP = 7, PADDING = 14, BORDER = 2;
 
 // 進行（ローカル保存）
 let world = Number(localStorage.getItem('sennyu_world') || 1);
@@ -170,36 +184,30 @@ const boardEl   = document.getElementById('board');
 const msgEl     = document.getElementById('message');
 
 /* ステージ → 盤サイズ */
-function calcSizeByWorld(w){
-  return 8 + (w-1)*2; // 8,10,12,14,...
-}
+function calcSizeByWorld(w){ return 8 + (w-1)*2; } // 8,10,12,14,...
 
-/* 罠数：サイズとサブに応じて少しずつ増やす（安全のため上限） */
+/* 罠数：サイズとサブに応じて微増（上限で詰み防止） */
 function calcTraps(size, w, s){
   const area = size*size;
-  const baseRatio = 0.16 + (w-1)*0.015 + (s-1)*0.01; // 世界・サブで微増
+  const baseRatio = 0.16 + (w-1)*0.015 + (s-1)*0.01;
   const raw = Math.round(area * baseRatio);
-  const cap = Math.floor(area * 0.28);               // 行き詰まり防止（28%上限）
-  // 左端列と城マスを除外するため、最低余白も少し確保
+  const cap = Math.floor(area * 0.28);
   return Math.min(cap, Math.max(8, raw));
 }
 
-/* スマホ向け：セルサイズ自動算出（--cell を上書き） */
+/* スマホ向け：セルサイズを“収まり最優先”で算出 */
 function adjustCellSize(){
-  // #boardWrap の実幅を取得
   const wrap = document.getElementById('boardWrap');
   const w = wrap.getBoundingClientRect().width;
-  // #board の内側にセルを並べるスペース
   const inner = w - (PADDING*2) - (BORDER*2) - (GAP*(SIZE-1));
   let cell = Math.floor(inner / SIZE);
-  if (!Number.isFinite(cell) || cell <= 0) cell = 48;
-  cell = Math.max(CAP_CELL_MIN, Math.min(CAP_CELL_MAX, cell));
+  if (!Number.isFinite(cell) || cell <= 0) cell = 40; // フォールバック
+  cell = Math.min(CAP_CELL_MAX, cell);                // 上限のみ
   document.documentElement.style.setProperty('--cell', cell + 'px');
 }
 
 /* 初期化 */
 function init(){
-  // ステージ情報
   SIZE = calcSizeByWorld(world);
   castle = {x: SIZE-1, y: Math.floor(SIZE/2)};
   trapsThisStage = calcTraps(SIZE, world, sub);
@@ -208,10 +216,8 @@ function init(){
   sizePill.textContent  = `Size: ${SIZE}×${SIZE}`;
   trapPill.textContent  = `罠: ${trapsThisStage}`;
 
-  // 盤の枠（列数）を更新
   boardEl.style.gridTemplateColumns = `repeat(${SIZE}, var(--cell))`;
 
-  // 盤面生成
   board = Array.from({length:SIZE},()=>Array(SIZE).fill(0));
   revealed = Array.from({length:SIZE},()=>Array(SIZE).fill(false));
   ninjaPos = null;
@@ -238,11 +244,10 @@ function init(){
   hideOverlay();
   setMsg("");
   draw();
-  // 最後にセルサイズ調整（描画後に実サイズが決まるため）
-  adjustCellSize();
+  adjustCellSize(); // 描画後にサイズ確定
 }
 
-/* 周囲8方向カウント */
+/* 周囲8方向 */
 function count8(x,y){
   let c=0;
   for(let dy=-1;dy<=1;dy++){
@@ -317,8 +322,7 @@ function onOpen(x,y){
     setMsg('💥 罠にかかった！', true);
     explodeFX();
     revealAll(); draw();
-    // 失敗：ステージ据え置き
-    return;
+    return; // 失敗：ステージ据え置き
   }
 
   draw();
@@ -327,27 +331,20 @@ function onOpen(x,y){
     setMsg('🎉 潜入成功！', false, true);
     celebrateFX();
     revealAll(); draw();
-    // 次へ：1→2→3→次ワールドの1…と進む
-    nextStage();
+    nextStage(); // 次へ
   }
 }
 
 /* 進行 */
 function nextStage(){
-  if(sub < 3){
-    sub += 1;
-  }else{
-    sub = 1;
-    world += 1;
-  }
+  if(sub < 3) sub += 1;
+  else { sub = 1; world += 1; }
   localStorage.setItem('sennyu_world', String(world));
   localStorage.setItem('sennyu_sub',   String(sub));
 }
 
-/* 全開示 */
+/* ユーティリティ */
 function revealAll(){ for(let y=0;y<SIZE;y++) for(let x=0;x<SIZE;x++) revealed[y][x]=true; }
-
-/* メッセージ */
 function setMsg(t, lose=false, win=false){
   msgEl.className=''; if(lose) msgEl.classList.add('lose'); if(win) msgEl.classList.add('win');
   msgEl.textContent=t;
@@ -359,7 +356,6 @@ function explodeFX(){
   setTimeout(()=>document.getElementById('boardWrap').classList.remove('shake'),600);
   const flash=document.createElement('div'); flash.className='flash';
   document.body.appendChild(flash); setTimeout(()=>flash.remove(),520);
-  // 失敗オーバーレイ
   document.getElementById('ovTitle').textContent='💥 任務失敗…';
   document.getElementById('ovDesc').textContent='罠にかかった！同じステージをやり直そう。';
   document.getElementById('ovNext').classList.add('hidden');
@@ -378,7 +374,6 @@ function celebrateFX(){
     cf.appendChild(s);
   }
   setTimeout(()=>{ cf.classList.add('hidden'); cf.innerHTML=''; }, 2600);
-  // 勝利オーバーレイ
   document.getElementById('ovTitle').textContent='🎉 潜入成功！';
   document.getElementById('ovDesc').textContent='本丸に到達！次のステージへ進めます。';
   document.getElementById('ovNext').classList.remove('hidden');
@@ -392,7 +387,7 @@ function hideOverlay(){ document.getElementById('overlay').classList.add('hidden
 /* ボタン */
 document.getElementById('retry').addEventListener('click', ()=>init());
 document.getElementById('ovRetry').addEventListener('click', ()=>{ hideOverlay(); init(); });
-document.getElementById('ovNext').addEventListener('click', ()=>{ hideOverlay(); init(); });
+document.getElementById('ovNext').addEventListener('click',  ()=>{ hideOverlay(); init(); });
 document.getElementById('resetProgress').addEventListener('click', ()=>{
   if(confirm('進行状況をリセットして World 1-1 から始めますか？')){
     world=1; sub=1;
@@ -402,9 +397,10 @@ document.getElementById('resetProgress').addEventListener('click', ()=>{
   }
 });
 
-/* リサイズでセルサイズ再計算 */
+/* リサイズで再計算（端切れ防止のため強化） */
 window.addEventListener('resize', adjustCellSize);
-window.addEventListener('orientationchange', ()=>setTimeout(adjustCellSize, 50));
+window.addEventListener('orientationchange', ()=>setTimeout(adjustCellSize, 100));
+new ResizeObserver(adjustCellSize).observe(document.getElementById('boardWrap'));
 
 /* 起動 */
 init();
