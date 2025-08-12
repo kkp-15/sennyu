@@ -3,11 +3,11 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
-<title>忍者潜入🏯 — ステージ制</title>
+<title>忍者潜入🏯 — ステージ&サイズアップ版</title>
 <style>
   :root{
     --bg:#0a0f1c; --text:#eef3ff; --muted:#a8b7d3;
-    --cell:52px;
+    --cell:52px; /* JSで画面幅に応じて上書き（40〜64px） */
     --covered1:#1a2b52; --covered2:#132447; --covered-border:#3a5a94;
     --open1:#0f1b37; --open2:#0a1430; --open-border:#2c497b;
     --frontier:#46e1ff; --frontier-glow:#46e1ff55;
@@ -16,7 +16,8 @@
     --castle-glow:#ffd54f; --focus:#00e5ff;
     --ok:#b4ffb4; --ng:#ff9b9b;
   }
-  *{box-sizing:border-box} html,body{height:100%}
+  *{box-sizing:border-box}
+  html,body{height:100%}
   body{
     margin:0; background:linear-gradient(180deg,#091327,#0a0f1c); color:var(--text);
     font-family:system-ui,-apple-system,"Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;
@@ -38,7 +39,7 @@
 
   #boardWrap{width:100%;display:flex;justify-content:center;margin:.5rem 0}
   #board{
-    display:grid; gap:7px; grid-template-columns:repeat(8,var(--cell));
+    display:grid; gap:7px; grid-template-columns:repeat(8,var(--cell)); /* JSで列数を更新 */
     background:#0b1734; border:2px solid #233a64; padding:14px; border-radius:16px;
     box-shadow:inset 0 0 0 1px rgba(255,255,255,.05),0 16px 40px rgba(0,0,0,.5);
     touch-action:manipulation;
@@ -54,7 +55,6 @@
   .cell:hover{filter:brightness(1.07)} .cell:active{transform:translateY(1px)}
   .cell:focus-visible{outline:3px solid var(--focus); outline-offset:2px}
 
-  /* 状態 */
   .cell.open{ background:linear-gradient(180deg,var(--open1),var(--open2)); border-color:var(--open-border); cursor:default; box-shadow:inset 0 3px 10px rgba(0,0,0,.45) }
   .cell.locked{ cursor:not-allowed; opacity:.50; background:repeating-linear-gradient(135deg,var(--locked-stripe) 0 8px,transparent 8px 16px),linear-gradient(180deg,var(--covered1),var(--covered2)) }
   .cell.frontier{ box-shadow:0 0 0 3px var(--frontier) inset, 0 0 16px 2px var(--frontier-glow); border-color:#4bd3ff; filter:brightness(1.06); animation:pulse 1.2s ease-in-out infinite alternate }
@@ -66,7 +66,7 @@
   .n1{color:#76b7ff}.n2{color:#55d68c}.n3{color:#ffc14d}.n4{color:#c5a3ff}
   .n5{color:#ff9a6b}.n6{color:#8fe3ff}.n7{color:#ff7d92}.n8{color:#ffffff}
 
-  /* 忍者マーカー */
+  /* 忍者マーカー（最後にタップしたマス） */
   .cell.ninja::before{
     content:"🥷"; position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
     font-size:calc(var(--cell)*0.58); transform:translateY(-1px);
@@ -74,7 +74,6 @@
   }
   @keyframes ninjaPop{ from{ transform:scale(.7) translateY(-1px); opacity:0 } to{ transform:scale(1) translateY(-1px); opacity:1 } }
 
-  /* メッセージ／ボタン */
   .bar{display:flex;gap:12px;justify-content:center;align-items:center;margin:.35rem 0;flex-wrap:wrap}
   .btn{ background:#16264a;border:2px solid #2a4272;color:#eaf1ff;border-radius:14px;font-weight:900;cursor:pointer; box-shadow:0 3px 10px rgba(0,0,0,.35); transition:transform .06s ease,filter .12s ease }
   .btn:hover{filter:brightness(1.08)} .btn:active{transform:translateY(1px)}
@@ -96,24 +95,28 @@
   .confetti span{ position:absolute; font-size:28px; animation:fall linear forwards; opacity:.95; }
   @keyframes fall{ 0%{ transform:translateY(-10vh) rotate(0deg) } 100%{ transform:translateY(110vh) rotate(360deg) } }
 
-  @media (max-width:420px){ :root{--cell:48px} .btn-lg{font-size:1.1rem} }
+  @media (max-width:420px){ .btn-lg{font-size:1.1rem} }
 </style>
 </head>
 <body>
   <header class="wrap">
     <h1>忍者潜入🏯</h1>
     <div class="hud" aria-label="説明と進行状況">
-      <span class="pill" id="stagePill">Stage 1</span>
+      <span class="pill" id="stagePill">World 1-1</span>
+      <span class="pill" id="sizePill">Size: 8×8</span>
       <span class="pill" id="trapPill">罠: 10</span>
       <span class="pill">数字＝そのマスの <b>周囲8方向</b> にある罠の数</span>
       <button class="linkbtn" id="resetProgress">はじめから</button>
     </div>
-    <p class="sub">ルール：左端から<strong>順番に</strong>／上下OK・斜めNG／0でも自動連鎖なし。タップ位置に🥷表示。</p>
+    <p class="sub">
+      ルール：左端から<strong>順番に</strong>／上下OK・斜めNG／0でも自動連鎖なし。<br>
+      見分け方：<b>光る縁＝今開けられる</b>、<b>濃色＝開いた</b>、<b>ストライプ＝まだ</b>。タップ位置に🥷表示。
+    </p>
   </header>
 
   <main class="wrap">
     <div id="boardWrap">
-      <div id="board" role="grid" aria-label="ゲーム盤面 8×8"></div>
+      <div id="board" role="grid" aria-label="ゲーム盤面"></div>
     </div>
 
     <div class="bar">
@@ -138,31 +141,77 @@
   <div id="confetti" class="confetti hidden"></div>
 
 <script>
-/* ===== 8×8 / 左から順のみ / 連鎖なし / 上下OK・斜めNG / ステージ制 ===== */
-const SIZE = 8;
-const BASE_TRAPS = 10;     // 基準の罠数（Stage 1）
-const TRAP_STEP  = 2;      // ステージ毎に増える数
-const TRAP_CAP   = 24;     // 上限（行き詰まり防止のため適度に制限）
+/* ===== ステージ & サイズアップ / スマホ自動リサイズ ===== */
+/* 仕様：左から順のみ / 上下OK・斜めNG / 自動連鎖なし / 忍者マーカー / フロント強調 */
 
-let level = Number(localStorage.getItem('sennyu_level') || 1);
-let board = [];     // 'T' or 0..8
-let revealed = [];  // boolean
-let trapsThisStage = BASE_TRAPS;
-const castle = {x: SIZE-1, y: Math.floor(SIZE/2)};
+const CAP_CELL_MAX = 64;  // 1マスの最大px
+const CAP_CELL_MIN = 40;  // 1マスの最小px
+const GAP = 7;            // CSSと合わせる（セルのgap）
+const PADDING = 14;       // #board の左右padding
+const BORDER = 2;         // #board のborder幅
+
+// 進行（ローカル保存）
+let world = Number(localStorage.getItem('sennyu_world') || 1);
+let sub   = Number(localStorage.getItem('sennyu_sub')   || 1); // 1..3
+
+// 盤面
+let SIZE = 8;
+let board = [];          // 'T' or 0..8
+let revealed = [];       // boolean
+let trapsThisStage = 10;
 let ninjaPos = null;
+let castle = {x: SIZE-1, y: Math.floor(SIZE/2)};
 
+// DOM
 const stagePill = document.getElementById('stagePill');
+const sizePill  = document.getElementById('sizePill');
 const trapPill  = document.getElementById('trapPill');
+const boardEl   = document.getElementById('board');
+const msgEl     = document.getElementById('message');
 
-function calcTraps(lv){
-  return Math.min(TRAP_CAP, BASE_TRAPS + (lv-1)*TRAP_STEP);
+/* ステージ → 盤サイズ */
+function calcSizeByWorld(w){
+  return 8 + (w-1)*2; // 8,10,12,14,...
 }
 
+/* 罠数：サイズとサブに応じて少しずつ増やす（安全のため上限） */
+function calcTraps(size, w, s){
+  const area = size*size;
+  const baseRatio = 0.16 + (w-1)*0.015 + (s-1)*0.01; // 世界・サブで微増
+  const raw = Math.round(area * baseRatio);
+  const cap = Math.floor(area * 0.28);               // 行き詰まり防止（28%上限）
+  // 左端列と城マスを除外するため、最低余白も少し確保
+  return Math.min(cap, Math.max(8, raw));
+}
+
+/* スマホ向け：セルサイズ自動算出（--cell を上書き） */
+function adjustCellSize(){
+  // #boardWrap の実幅を取得
+  const wrap = document.getElementById('boardWrap');
+  const w = wrap.getBoundingClientRect().width;
+  // #board の内側にセルを並べるスペース
+  const inner = w - (PADDING*2) - (BORDER*2) - (GAP*(SIZE-1));
+  let cell = Math.floor(inner / SIZE);
+  if (!Number.isFinite(cell) || cell <= 0) cell = 48;
+  cell = Math.max(CAP_CELL_MIN, Math.min(CAP_CELL_MAX, cell));
+  document.documentElement.style.setProperty('--cell', cell + 'px');
+}
+
+/* 初期化 */
 function init(){
-  trapsThisStage = calcTraps(level);
-  stagePill.textContent = `Stage ${level}`;
+  // ステージ情報
+  SIZE = calcSizeByWorld(world);
+  castle = {x: SIZE-1, y: Math.floor(SIZE/2)};
+  trapsThisStage = calcTraps(SIZE, world, sub);
+
+  stagePill.textContent = `World ${world}-${sub}`;
+  sizePill.textContent  = `Size: ${SIZE}×${SIZE}`;
   trapPill.textContent  = `罠: ${trapsThisStage}`;
 
+  // 盤の枠（列数）を更新
+  boardEl.style.gridTemplateColumns = `repeat(${SIZE}, var(--cell))`;
+
+  // 盤面生成
   board = Array.from({length:SIZE},()=>Array(SIZE).fill(0));
   revealed = Array.from({length:SIZE},()=>Array(SIZE).fill(false));
   ninjaPos = null;
@@ -189,8 +238,11 @@ function init(){
   hideOverlay();
   setMsg("");
   draw();
+  // 最後にセルサイズ調整（描画後に実サイズが決まるため）
+  adjustCellSize();
 }
 
+/* 周囲8方向カウント */
 function count8(x,y){
   let c=0;
   for(let dy=-1;dy<=1;dy++){
@@ -214,9 +266,9 @@ function canOpen(x,y){
   return false;
 }
 
+/* 描画 */
 function draw(){
-  const root=document.getElementById('board');
-  root.innerHTML='';
+  boardEl.innerHTML='';
   for(let y=0;y<SIZE;y++){
     for(let x=0;x<SIZE;x++){
       const el=document.createElement('button');
@@ -248,11 +300,12 @@ function draw(){
         if(e.key==='Enter'||e.key===' '){ e.preventDefault(); onOpen(x,y); }
       });
 
-      root.appendChild(el);
+      boardEl.appendChild(el);
     }
   }
 }
 
+/* 操作 */
 function onOpen(x,y){
   if(!canOpen(x,y)){ setMsg('左端→到達済みの上下左右だけ開けられます。'); return; }
   if(revealed[y][x]) return;
@@ -264,7 +317,7 @@ function onOpen(x,y){
     setMsg('💥 罠にかかった！', true);
     explodeFX();
     revealAll(); draw();
-    // 失敗：レベル維持（同ステージやり直し）
+    // 失敗：ステージ据え置き
     return;
   }
 
@@ -274,20 +327,33 @@ function onOpen(x,y){
     setMsg('🎉 潜入成功！', false, true);
     celebrateFX();
     revealAll(); draw();
-    // クリア：次のステージへ
-    level++;
-    localStorage.setItem('sennyu_level', String(level));
+    // 次へ：1→2→3→次ワールドの1…と進む
+    nextStage();
   }
 }
 
-function revealAll(){ for(let y=0;y<SIZE;y++) for(let x=0;x<SIZE;x++) revealed[y][x]=true; }
-function setMsg(t, lose=false, win=false){
-  const el=document.getElementById('message');
-  el.className=''; if(lose) el.classList.add('lose'); if(win) el.classList.add('win');
-  el.textContent=t;
+/* 進行 */
+function nextStage(){
+  if(sub < 3){
+    sub += 1;
+  }else{
+    sub = 1;
+    world += 1;
+  }
+  localStorage.setItem('sennyu_world', String(world));
+  localStorage.setItem('sennyu_sub',   String(sub));
 }
 
-/* エフェクト */
+/* 全開示 */
+function revealAll(){ for(let y=0;y<SIZE;y++) for(let x=0;x<SIZE;x++) revealed[y][x]=true; }
+
+/* メッセージ */
+function setMsg(t, lose=false, win=false){
+  msgEl.className=''; if(lose) msgEl.classList.add('lose'); if(win) msgEl.classList.add('win');
+  msgEl.textContent=t;
+}
+
+/* 成否演出 */
 function explodeFX(){
   document.getElementById('boardWrap').classList.add('shake');
   setTimeout(()=>document.getElementById('boardWrap').classList.remove('shake'),600);
@@ -296,7 +362,7 @@ function explodeFX(){
   // 失敗オーバーレイ
   document.getElementById('ovTitle').textContent='💥 任務失敗…';
   document.getElementById('ovDesc').textContent='罠にかかった！同じステージをやり直そう。';
-  document.getElementById('ovNext').classList.add('hidden'); // 失敗時は「次へ」は隠す
+  document.getElementById('ovNext').classList.add('hidden');
   showOverlay();
 }
 function celebrateFX(){
@@ -319,18 +385,26 @@ function celebrateFX(){
   showOverlay();
 }
 
+/* オーバーレイ */
 function showOverlay(){ document.getElementById('overlay').classList.remove('hidden'); }
 function hideOverlay(){ document.getElementById('overlay').classList.add('hidden'); }
 
 /* ボタン */
-document.getElementById('retry').addEventListener('click', ()=>init());               // 同ステージ
+document.getElementById('retry').addEventListener('click', ()=>init());
 document.getElementById('ovRetry').addEventListener('click', ()=>{ hideOverlay(); init(); });
 document.getElementById('ovNext').addEventListener('click', ()=>{ hideOverlay(); init(); });
 document.getElementById('resetProgress').addEventListener('click', ()=>{
-  if(confirm('進行状況をリセットして Stage 1 から始めますか？')){
-    level = 1; localStorage.setItem('sennyu_level','1'); init();
+  if(confirm('進行状況をリセットして World 1-1 から始めますか？')){
+    world=1; sub=1;
+    localStorage.setItem('sennyu_world','1');
+    localStorage.setItem('sennyu_sub','1');
+    init();
   }
 });
+
+/* リサイズでセルサイズ再計算 */
+window.addEventListener('resize', adjustCellSize);
+window.addEventListener('orientationchange', ()=>setTimeout(adjustCellSize, 50));
 
 /* 起動 */
 init();
